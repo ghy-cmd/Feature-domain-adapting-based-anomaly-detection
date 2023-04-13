@@ -359,7 +359,7 @@ class PatchCore(torch.nn.Module):
         This function computes the embeddings of the training data and fills the
         memory bank of SPADE.
         """
-        self._fill_memory_bank(training_data)
+        return self._fill_memory_bank(training_data)
 
     def _fill_memory_bank(self, input_data):
         """Computes and sets the support features for SPADE."""
@@ -386,6 +386,7 @@ class PatchCore(torch.nn.Module):
         features = self.featuresampler.run(features)  # [16385,1024]ndarray
         self.anomaly_scorer.fit(detection_features=[features])
         self._attention_train(input_data, features)
+        return features
 
     def _attention_train(self, train_loader, feature_bank):
         torch.cuda.empty_cache()
@@ -429,10 +430,10 @@ class PatchCore(torch.nn.Module):
                     # torch.Size([392, 1024])torch.Size([392, 1024])torch.Size([392, 1024])torch.Size([392, 1024])
                     # print(z_aug.size(), z_aug_new.size(), z.size(), z_new.size())
                     loss_COS2 = torch.mean(1 - self.similarity_loss(z_aug_new, z_new))
-                    print(self.similarity_loss(z_aug_new, z_new).size())
-                    print(loss_COS2.size())
+                    # print(self.similarity_loss(z_aug_new, z_new).size())[392]
+                    # print(loss_COS2.size())[1]
                     regular = self.mse_loss(z, z_new) + torch.mean(1 - self.similarity_loss(z, z_new))
-                    print(regular.size())
+                    # print(regular.size())[1]
                     loss = loss_COS2 + 2.0 * regular
                     loss.backward(retain_graph=True)
                     train_loss += loss.item()
@@ -447,6 +448,65 @@ class PatchCore(torch.nn.Module):
         if isinstance(data, torch.utils.data.DataLoader):
             return self._predict_dataloader(data)
         return self._predict(data)
+
+    def predict_attention(self, data, feature_bank):
+        torch.cuda.empty_cache()
+        similarity_loss = torch.nn.CosineSimilarity()
+        scores = []
+        masks = []
+        labels_gt = []
+        masks_gt = []
+        with torch.no_grad():
+            with tqdm.tqdm(
+                    data, desc="Testing attention model...", position=1, leave=False
+            ) as data_iterator:
+                for image in data_iterator:
+                    if isinstance(image, dict):
+                        # print(image["image_path"])
+                        labels_gt.extend(image["is_anomaly"].numpy().tolist())  # [1,1]
+                        masks_gt.extend(image["mask"].numpy().tolist())  # {list:2}{list:1}{list:224}{list:224}
+                        image = image["image"]
+                    image = image.to(torch.float).to(self.device)
+                    batchsize = image.shape[0]  # 2
+                    z, patch_shapes = self._embed(images=image, provide_patch_shapes=True)
+                    torch.cuda.empty_cache()
+                    z = np.asarray(z)
+                    torch.cuda.empty_cache()
+                    z_tensor = torch.tensor(z).to(self.device)
+                    score, Distance, Index = self.anomaly_scorer.predict([z])
+                    new_z_list = []
+                    for i in range(z.shape[0]):
+                        newz = feature_bank[Index[i][1:6]]
+                        newz = torch.tensor(newz).unsqueeze(0)
+                        # torch.Size([1, 5, 1024])
+                        new_z_list.append(newz)
+                    # print(len(new_z_list))
+                    # 392
+                    new_z_list = torch.cat(new_z_list, dim=0).to(self.device)
+                    # print(new_z_list.size())
+                    # torch.Size([392, 5, 1024])
+                    z_aug, z_aug2, z, z_2 = self.ATTENTION(new_z_list, z_tensor)
+                    del new_z_list, z_tensor
+                    torch.cuda.empty_cache()
+                    loss_cos = (1 - similarity_loss(z_aug2, z_2))
+                    score = loss_cos.cpu().numpy()  # [392]
+                    del z_aug, z_aug2, z, z_2, loss_cos
+                    torch.cuda.empty_cache()
+                    # print(score.shape)
+                    patch_scores = image_scores = score.reshape(batchsize, -1, *score.shape[1:])  # [2,196]
+                    # print(patch_scores.shape)
+                    image_scores = image_scores.reshape(*image_scores.shape[:2], -1)  # (2, 784, 1)
+                    image_scores = self.patch_maker.score(image_scores)  # [7.426983  7.4016705]
+                    scales = patch_shapes[0]  # [28,28]
+                    # print(scales)
+                    patch_scores = patch_scores.reshape(batchsize, scales[0], scales[1])  # (2, 28, 28)
+                    masks_temp = self.anomaly_segmentor.convert_to_segmentation(
+                        patch_scores)  # {list:2}{ndarray:(224,224)}
+                    _scores, _masks = [score for score in image_scores], [mask for mask in masks_temp]
+                    for score, mask in zip(_scores, _masks):
+                        scores.append(score)  # [7.426983,7.4016705]
+                        masks.append(mask)  # {list:2}{ndarray:(224,224)}
+                return scores, masks, labels_gt, masks_gt
 
     def _predict_dataloader(self, dataloader):
         """This function provides anomaly scores/maps for full dataloaders."""

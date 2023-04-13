@@ -200,7 +200,7 @@ if data == "mvtec":
     _LOG_PROJECT = "MVTecAD_Results-NEW"
     # _CLASSNAMES = ["bottle", "cable", "capsule", "carpet", "grid", "hazelnut", "leather",
     #                "metal_nut", "pill", "screw", "tile", "toothbrush", "transistor", "wood", "zipper", ]
-    _CLASSNAMES = ["bottle", ]
+    _CLASSNAMES = ["bottle", "capsule", ]
 elif data == "optical":
     CHANEL = False
     _DATA_PATH = "/home/guihaoyue_bishe/data/data_detection/Optical"
@@ -251,7 +251,7 @@ _PATCHSIZE = 3
 _ANOMALY_SCORER_NUM_NN = 6
 _SAVE_SEGMENTATION_IMAGES = False
 _SAVE_PATCHCORE_MODEL = False
-_EPOCHS = 30
+_EPOCHS = 10
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
@@ -311,7 +311,7 @@ if __name__ == "__main__":
                 )
                 torch.cuda.empty_cache()
                 # 提取特征，下采样，初始化faissNN，index.add(features)
-                PatchCore.fit(dataloaders["training"])
+                feature_bank = PatchCore.fit(dataloaders["training"])
 
             torch.cuda.empty_cache()
             aggregator = {"scores": [], "segmentations": []}
@@ -322,8 +322,8 @@ if __name__ == "__main__":
                         i + 1, len(PatchCore_list)
                     )
                 )
-                scores, segmentations, labels_gt, masks_gt = PatchCore.predict(
-                    dataloaders["testing"]
+                scores, segmentations, labels_gt, masks_gt = PatchCore.predict_attention(
+                    dataloaders["testing"], feature_bank
                 )  # scores:{list:83} segmentations:{list:83}{ndarray(224,224)} labels_gt:{list:83} masks_gt:{
                 # list:83-1-224-224}
                 # print(segmentations.shape)
