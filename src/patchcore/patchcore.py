@@ -436,6 +436,8 @@ class PatchCore(torch.nn.Module):
                     # print(regular.size())[1]
                     loss = loss_COS2 + 2.0 * regular
                     loss.backward(retain_graph=True)
+                    del z_aug, z_aug_new, z, z_new, loss_COS2, regular
+                    torch.cuda.empty_cache()
                     train_loss += loss.item()
                     n_batch += 1
                     self.optimizer.step()

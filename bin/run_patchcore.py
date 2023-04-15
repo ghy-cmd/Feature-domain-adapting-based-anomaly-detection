@@ -165,7 +165,7 @@ mvtec,optical,altex,sdd
 '''
 data = "mvtec"
 Mode = "swin2"  # swin1/resnet
-_LOG_GROUP = "swin2_layer23_stack_identity"  # swin1_layer2and3/resnet_layer2and3
+_LOG_GROUP = "swin2_layer23_stack_identity_epochs=50"  # swin1_layer2and3/resnet_layer2and3
 _SAMPLER_TYPE = "identity"  # "approx_greedy_coreset"/"greedy_coreset"/"identity"
 '''
 False:mvtec,optical
@@ -198,9 +198,9 @@ if data == "mvtec":
     CHANEL = False
     _DATA_PATH = "/home/guihaoyue_bishe/mvtec"
     _LOG_PROJECT = "MVTecAD_Results-NEW"
-    # _CLASSNAMES = ["bottle", "cable", "capsule", "carpet", "grid", "hazelnut", "leather",
-    #                "metal_nut", "pill", "screw", "tile", "toothbrush", "transistor", "wood", "zipper", ]
-    _CLASSNAMES = ["bottle", "capsule", ]
+    _CLASSNAMES = ["bottle", "cable", "capsule", "carpet", "grid", "hazelnut", "leather",
+                   "metal_nut", "pill", "screw", "tile", "toothbrush", "transistor", "wood", "zipper", ]
+    # _CLASSNAMES = ["bottle", "capsule", ]
 elif data == "optical":
     CHANEL = False
     _DATA_PATH = "/home/guihaoyue_bishe/data/data_detection/Optical"
@@ -239,7 +239,7 @@ _IMAGESIZE = 224
 _SEED = 0
 _AUGMENT = False
 _BATCH_SIZE = 2
-_NUM_WORKERS = 8
+_NUM_WORKERS = 0
 _GPU = [0]
 
 _SAMPLER_PERCENTAGE = 0.1
@@ -251,7 +251,7 @@ _PATCHSIZE = 3
 _ANOMALY_SCORER_NUM_NN = 6
 _SAVE_SEGMENTATION_IMAGES = False
 _SAVE_PATCHCORE_MODEL = False
-_EPOCHS = 10
+_EPOCHS = 50
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
