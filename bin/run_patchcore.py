@@ -165,7 +165,7 @@ mvtec,optical,altex,sdd
 '''
 data = "mvtec"
 Mode = "swin2"  # swin1/resnet
-_LOG_GROUP = "swin2_layer23_stack_identity_epochs=50"  # swin1_layer2and3/resnet_layer2and3
+_LOG_GROUP = "swin2_layer23_epoch=5_k=5"  # swin1_layer2and3/resnet_layer2and3
 _SAMPLER_TYPE = "identity"  # "approx_greedy_coreset"/"greedy_coreset"/"identity"
 '''
 False:mvtec,optical
@@ -197,24 +197,24 @@ _CLASSNAMES = ["optical_class"]
 if data == "mvtec":
     CHANEL = False
     _DATA_PATH = "/home/guihaoyue_bishe/mvtec"
-    _LOG_PROJECT = "MVTecAD_Results-NEW"
+    _LOG_PROJECT = "MVTecAD_Results-SAVE"
     _CLASSNAMES = ["bottle", "cable", "capsule", "carpet", "grid", "hazelnut", "leather",
                    "metal_nut", "pill", "screw", "tile", "toothbrush", "transistor", "wood", "zipper", ]
-    # _CLASSNAMES = ["bottle", "capsule", ]
+    # _CLASSNAMES = ["bottle", ]
 elif data == "optical":
     CHANEL = False
     _DATA_PATH = "/home/guihaoyue_bishe/data/data_detection/Optical"
-    _LOG_PROJECT = "Optical_Results"
+    _LOG_PROJECT = "Optical_Results-NEW"
     _CLASSNAMES = ["optical_class"]
 elif data == "altex":
     CHANEL = True
     _DATA_PATH = "/home/guihaoyue_bishe/data/data_detection"
-    _LOG_PROJECT = "Aitex_results"
+    _LOG_PROJECT = "Aitex_results-NEW"
     _CLASSNAMES = ["AITEX"]
 elif data == "sdd":
     CHANEL = True
     _DATA_PATH = "/home/guihaoyue_bishe/data/data_detection/SDD"
-    _LOG_PROJECT = "SDD_Results"
+    _LOG_PROJECT = "SDD_Results-NEW"
     _CLASSNAMES = ["SDD"]
 
 Backbone = ('wideresnet50')  # vit_swin_base/wideresnet50
@@ -238,9 +238,9 @@ _TRAIN_VAL_SPLIT = 1.0
 _IMAGESIZE = 224
 _SEED = 0
 _AUGMENT = False
-_BATCH_SIZE = 8
+_BATCH_SIZE = 32
 _NUM_WORKERS = 0
-_GPU = [0]
+_GPU = [8]
 
 _SAMPLER_PERCENTAGE = 0.1
 _FAISS_ON_GPU = False
@@ -248,10 +248,11 @@ _FAISS_NUM_WORKERS = 8
 _PRETRAIN_EMBED_DIMENSION = 1024
 _TARGET_EMBED_DIMENSION = 1024
 _PATCHSIZE = 3
-_ANOMALY_SCORER_NUM_NN = 11
+_ANOMALY_SCORER_NUM_NN = 6  # k+1
 _SAVE_SEGMENTATION_IMAGES = False
 _SAVE_PATCHCORE_MODEL = False
-_EPOCHS = 20
+_EPOCHS = 5
+_SAVE_RES = True
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
@@ -405,6 +406,7 @@ if __name__ == "__main__":
                 segmentations, masks_gt
             )  # 像素级分数
             full_pixel_auroc = pixel_scores["auroc"]  # 0.9848
+            optimal_threshold = pixel_scores["optimal_threshold"]
 
             # Compute PRO score & PW Auroc only images with anomalies只计算异常图分数
             sel_idxs = []
@@ -416,6 +418,7 @@ if __name__ == "__main__":
                 [masks_gt[i] for i in sel_idxs],
             )
             anomaly_pixel_auroc = pixel_scores["auroc"]
+            # optimal_threshold = pixel_scores["optimal_threshold"]
 
             result_collect.append(
                 {
@@ -429,6 +432,47 @@ if __name__ == "__main__":
             for key, item in result_collect[-1].items():
                 if key != "dataset_name":
                     LOGGER.info("{0}: {1:3.3f}".format(key, item))
+
+            if _SAVE_RES:
+                image_paths = [
+                    x[2] for x in dataloaders["testing"].dataset.data_to_iterate
+                ]
+                mask_paths = [
+                    x[3] for x in dataloaders["testing"].dataset.data_to_iterate
+                ]
+
+
+                def image_transform(image):
+                    in_std = np.array(
+                        dataloaders["testing"].dataset.transform_std
+                    ).reshape(-1, 1, 1)
+                    in_mean = np.array(
+                        dataloaders["testing"].dataset.transform_mean
+                    ).reshape(-1, 1, 1)
+                    image = dataloaders["testing"].dataset.transform_img(image)
+                    return np.clip(
+                        (image.numpy() * in_std + in_mean) * 255, 0, 255
+                    ).astype(np.uint8)
+
+
+                def mask_transform(mask):
+                    return dataloaders["testing"].dataset.transform_mask(mask).numpy()
+
+
+                image_save_path = os.path.join(
+                    run_save_path, "res_images", dataset_name
+                )
+                os.makedirs(image_save_path, exist_ok=True)
+                patchcore.utils.plot_res_images(
+                    image_save_path,
+                    image_paths,
+                    segmentations,
+                    optimal_threshold,
+                    scores,
+                    mask_paths,
+                    image_transform=image_transform,
+                    mask_transform=mask_transform,
+                )
 
             # (Optional) Store PatchCore model for later re-use.
             # SAVE all patchcores only if mean_threshold is passed?

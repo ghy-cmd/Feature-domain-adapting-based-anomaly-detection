@@ -5,7 +5,7 @@
       <paths name="guihaoyue_bishe@115.25.142.112:22 password">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/guihaoyue_bishe/TransPatch" local="$PROJECT_DIR$" />
+            <mapping deploy="/home/guihaoyue_bishe/data/lxy" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

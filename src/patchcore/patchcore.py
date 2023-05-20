@@ -44,6 +44,7 @@ class PatchCore(torch.nn.Module):
     ):
         self.backbone = backbone.to(device)
         self.layers_to_extract_from = layers_to_extract_from
+        print(self.layers_to_extract_from)
         self.input_shape = input_shape
         self.mode = mode
 
@@ -252,7 +253,8 @@ class PatchCore(torch.nn.Module):
             # features[1] = features[1].reshape(features[1].shape[0], layer2, layer2, features[1].shape[2])
             # features[2] = features[2].reshape(features[2].shape[0], layer3, layer3, features[2].shape[2])
             # patch_shapes = [[layer1, layer1], [layer2, layer2], [layer3, layer3]]  # [[28, 28], [14, 14],[7,7]]
-            patch_shapes = [[layer2, layer2], [layer3, layer3], [layer4, layer4]]  # [[28, 28], [14, 14],[7,7]]
+            # patch_shapes = [[layer2, layer2], [layer3, layer3], [layer4, layer4]]  # [[28, 28], [14, 14],[7,7]]
+            patch_shapes = [[layer2, layer2], ]  # [[28, 28], [14, 14],[7,7]]
             ref_num_patches = patch_shapes[0]  # [28,28]
             # torch.Size([2, 784,256]) torch.Size([2, 196,512]) torch.Size([2, 49,1024])
             for i in range(1, len(features)):
